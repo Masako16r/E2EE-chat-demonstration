@@ -1,12 +1,24 @@
 services:
   backend:
     build: ./backend
+    env_file:
+      - ./backend/.env
     ports:
       - "4000:4000"
     volumes:
       - ./backend:/app
       - /app/node_modules
     restart: unless-stopped
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    environment:
+      NODE_ENV: production
 
   frontend:
     build: ./frontend
@@ -14,9 +26,33 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app
-      - /app/node_modules
+      - frontend_node_modules:/app/node_modules
     env_file:
       - ./frontend/.env
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    container_name: e2ee_chat_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: e2ee_chat_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+  backend_node_modules:
+  frontend_node_modules:
