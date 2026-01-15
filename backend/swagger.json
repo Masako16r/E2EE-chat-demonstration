@@ -41,6 +41,10 @@
                                         "type": "string",
                                         "format": "password",
                                         "example": "strongpassword123#"
+                                    },
+                                    "publicKey": {
+                                        "type": "string",
+                                        "example": "Public Key String"
                                     }
                                 },
                                 "required": ["email", "password"]
@@ -152,7 +156,7 @@
                 }
             }
         },
-        "/api/me": {
+        "/api/users/me": {
             "get": {
                 "summary": "Get current authenticated user",
                 "tags": ["User"],
@@ -169,20 +173,15 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "userId": {
+                                        "id": {
                                             "type": "string",
-                                            "description": "User ID from JWT token",
+                                            "description": "User ID",
                                             "example": "550e8400-e29b-41d4-a716-446655440000"
                                         },
                                         "email": {
                                             "type": "string",
                                             "format": "email",
                                             "example": "user@example.com"
-                                        },
-                                        "publicKey": {
-                                            "type": "string",
-                                            "nullable": true,
-                                            "description": "User's public key for encryption"
                                         },
                                         "createdAt": {
                                             "type": "string",
@@ -194,9 +193,593 @@
                         }
                     },
                     "401": {
-                        "description": "Unauthorized - Missing or invalid bearer token",
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    },
+                    "404": {
+                        "description": "User not found"
+                    }
+                }
+            }
+        },
+        "/api/users/available": {
+            "get": {
+                "summary": "Get list of available users (excluding current user)",
+                "tags": ["User"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of available users",
                         "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "example": "550e8400-e29b-41d4-a716-446655440000"
+                                            },
+                                            "email": {
+                                                "type": "string",
+                                                "format": "email",
+                                                "example": "user@example.com"
+                                            },
+                                            "createdAt": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    }
+                }
+            }
+        },
+        "/api/users/search": {
+            "get": {
+                "summary": "Search user by email",
+                "tags": ["User"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "email",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "email"
+                        },
+                        "description": "Email address to search for",
+                        "example": "user@example.com"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "example": "550e8400-e29b-41d4-a716-446655440000"
+                                        },
+                                        "email": {
+                                            "type": "string",
+                                            "format": "email",
+                                            "example": "user@example.com"
+                                        },
+                                        "createdAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Email parameter is required"
+                    },
+                    "401": {
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    },
+                    "404": {
+                        "description": "User not found"
+                    }
+                }
+            }
+        },
+        "/api/users/{id}/public-key": {
+            "get": {
+                "summary": "Get user's public key by user ID",
+                "tags": ["User"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "User ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User's public key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "publicKey": {
+                                            "type": "string",
+                                            "example": "Public Key String"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    },
+                    "404": {
+                        "description": "User not found"
+                    }
+                }
+            }
+        },
+
+        "/api/chats": {
+            "get": {
+                "summary": "Get list of chats for the authenticated user",
+                "tags": ["Chat"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of chats with participants",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "example": "550e8400-e29b-41d4-a716-446655440000"
+                                            },
+                                            "participants": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string",
+                                                            "format": "uuid",
+                                                            "example": "550e8400-e29b-41d4-a716-446655440001"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "format": "email",
+                                                            "example": "user@example.com"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "createdAt": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create a new chat between two users",
+                "tags": ["Chat"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "userId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "description": "ID of the other user to chat with",
+                                        "example": "550e8400-e29b-41d4-a716-446655440001"
+                                    }
+                                },
+                                "required": ["userId"]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Chat created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "example": "550e8400-e29b-41d4-a716-446655440000"
+                                        },
+                                        "participants": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "format": "email"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Invalid user ID or user does not exist"
+                    },
+                    "401": {
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    }
+                }
+            }
+        },
+
+        "api/users/{id}/public-key": {
+            "get": {
+                "summary": "Get user's public key by user ID",
+                "tags": ["User"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "User ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User's public key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "publicKey": {
+                                            "type": "string",
+                                            "example": "Public Key String"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    },
+                    "404": {
+                        "description": "User not found"
+                    }
+                }
+            }
+        },
+
+        "/api/messages": {
+            "post": {
+                "summary": "Store encrypted message in chat (Backend cannot read content)",
+                "tags": ["Message"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "chatId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "description": "Chat ID where message is sent",
+                                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    },
+                                    "message": {
+                                        "type": "object",
+                                        "properties": {
+                                            "messageId": {
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "description": "Unique message ID (generated by frontend)",
+                                                "example": "550e8400-e29b-41d4-a716-446655440001"
+                                            },
+                                            "cipherForUsers": {
+                                                "type": "array",
+                                                "description": "One cipher entry per chat participant (end-to-end encrypted)",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "forUserId": {
+                                                            "type": "string",
+                                                            "format": "uuid",
+                                                            "description": "User ID this cipher is encrypted for",
+                                                            "example": "550e8400-e29b-41d4-a716-446655440002"
+                                                        },
+                                                        "ciphertext": {
+                                                            "type": "string",
+                                                            "description": "AES-256-GCM encrypted message (Base64 encoded)",
+                                                            "example": "aGVsbG8gd29ybGQ="
+                                                        },
+                                                        "iv": {
+                                                            "type": "string",
+                                                            "description": "Initialization Vector (Base64 encoded)",
+                                                            "example": "aGVsbG8="
+                                                        },
+                                                        "authTag": {
+                                                            "type": "string",
+                                                            "description": "Authentication Tag for GCM (Base64 encoded)",
+                                                            "example": "dGFn"
+                                                        }
+                                                    },
+                                                    "required": ["forUserId", "ciphertext", "iv", "authTag"]
+                                                }
+                                            }
+                                        },
+                                        "required": ["messageId", "cipherForUsers"]
+                                    }
+                                },
+                                "required": ["chatId", "message"]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Message stored successfully (encrypted, backend cannot read)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "messageId": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "chatId": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "senderId": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "createdAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Invalid chat ID or malformed cipher data"
+                    },
+                    "401": {
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    },
+                    "403": {
+                        "description": "Forbidden - User is not a participant in this chat"
+                    }
+                }
+            },
+            "get": {
+                "summary": "Get encrypted messages from a chat (only for chat participants)",
+                "tags": ["Message"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "chatId",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Chat ID to fetch messages from",
+                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                    },
+                    {
+                        "name": "since",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Only fetch messages created after this timestamp (ISO 8601)",
+                        "example": "2025-01-02T10:30:00Z"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Encrypted messages (user receives only their own cipher)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "messageId": {
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "example": "550e8400-e29b-41d4-a716-446655440001"
+                                            },
+                                            "senderId": {
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "example": "550e8400-e29b-41d4-a716-446655440002"
+                                            },
+                                            "ciphertext": {
+                                                "type": "string",
+                                                "description": "Encrypted message (only for requesting user)",
+                                                "example": "aGVsbG8gd29ybGQ="
+                                            },
+                                            "iv": {
+                                                "type": "string",
+                                                "description": "Initialization Vector",
+                                                "example": "aGVsbG8="
+                                            },
+                                            "authTag": {
+                                                "type": "string",
+                                                "description": "Authentication Tag",
+                                                "example": "dGFn"
+                                            },
+                                            "createdAt": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Missing chatId parameter"
+                    },
+                    "401": {
+                        "description": "Unauthorized - Missing or invalid bearer token"
+                    },
+                    "403": {
+                        "description": "Forbidden - User is not a participant in this chat"
+                    }
+                }
+            }
+        },
+
+        "/api/admin/verify-access": {
+            "get": {
+                "summary": "Admin endpoint - Verify user cannot access messages from chats they're not part of",
+                "tags": ["Admin"],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "chatId",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Chat ID to test access denial"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Access verification result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "hasAccess": {
+                                            "type": "boolean",
+                                            "description": "Whether user is participant in chat",
+                                            "example": true
+                                        },
+                                        "userId": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "chatId": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "Chat not found"
                     }
                 }
             }
@@ -218,6 +801,186 @@
                 "responses": {
                     "200": {
                         "description": "API is ready"
+                    }
+                }
+            }
+        },
+
+        "/api/users/all": {
+            "get": {
+                "summary": "Get all users in the system (public endpoint for demonstration)",
+                "tags": ["User"],
+                "security": [],
+                "responses": {
+                    "200": {
+                        "description": "List of all users in the system",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "format": "uuid",
+                                                "example": "550e8400-e29b-41d4-a716-446655440000"
+                                            },
+                                            "email": {
+                                                "type": "string",
+                                                "format": "email",
+                                                "example": "user@example.com"
+                                            },
+                                            "createdAt": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        "/api/chats/between": {
+            "get": {
+                "summary": "Get chat between two users (public endpoint for demonstration)",
+                "tags": ["Chat"],
+                "security": [],
+                "parameters": [
+                    {
+                        "name": "user1Id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "First user ID"
+                    },
+                    {
+                        "name": "user2Id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Second user ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Chat between two users",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "participants": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "format": "email"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Missing or invalid user IDs"
+                    },
+                    "404": {
+                        "description": "Chat not found between these users"
+                    }
+                }
+            }
+        },
+
+        "/api/messages/public": {
+            "get": {
+                "summary": "Get encrypted messages from a chat (public endpoint - messages are encrypted, cannot be read without private keys)",
+                "tags": ["Message"],
+                "security": [],
+                "parameters": [
+                    {
+                        "name": "chatId",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Chat ID to fetch encrypted messages from"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Encrypted messages from chat (content is encrypted and unreadable without private key)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "format": "uuid"
+                                            },
+                                            "ciphertext": {
+                                                "type": "string",
+                                                "description": "Encrypted message content (Base64 encoded)"
+                                            },
+                                            "iv": {
+                                                "type": "string",
+                                                "description": "Initialization vector for AES-GCM (Base64 encoded)"
+                                            },
+                                            "senderId": {
+                                                "type": "string",
+                                                "format": "uuid"
+                                            },
+                                            "sender": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "email": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            },
+                                            "createdAt": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Missing chatId parameter"
+                    },
+                    "404": {
+                        "description": "Chat not found"
                     }
                 }
             }

@@ -10,7 +10,9 @@ services:
       - /app/node_modules
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    command: sh -c "npm run migrate && npm start"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health/ready"]
       interval: 30s

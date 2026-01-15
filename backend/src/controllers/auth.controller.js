@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 
 export const register = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, publicKey } = req.body;
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
@@ -14,7 +14,7 @@ export const register = asyncHandler(async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.create({
-    data: { email, passwordHash },
+    data: { email, passwordHash, publicKey },
   });
 
   res.status(201).json({
@@ -42,5 +42,5 @@ export const login = asyncHandler(async (req, res) => {
     { expiresIn: process.env.JWT_EXPIRES_IN || "1h" }
   );
 
-  res.json({ token });
+  res.json({ token, userId: user.id });
 });

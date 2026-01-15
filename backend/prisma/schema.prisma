@@ -4,17 +4,13 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-
 generator client {
-  provider = "prisma-client"
-  engineType = "client"
-  output   = "./generated/main"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
 }
-
 
 model User {
   id           String   @id @default(uuid())
@@ -22,4 +18,41 @@ model User {
   passwordHash String
   publicKey    String?
   createdAt    DateTime @default(now())
+
+  // Relaciones
+  chats         ChatParticipant[]
+  sentMessages  Message[]  @relation("sender")
+}
+
+model Chat {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Relaciones
+  participants ChatParticipant[]
+  messages     Message[]
+}
+
+model ChatParticipant {
+  chatId String
+  userId String
+
+  // Relaciones
+  chat Chat  @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([chatId, userId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  chatId    String
+  senderId  String
+  ciphertext String
+  iv        String
+  createdAt DateTime @default(now())
+
+  // Relaciones
+  chat    Chat  @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender  User  @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
 }

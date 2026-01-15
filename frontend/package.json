@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "dev:watch": "vite --host --force",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "lucide-react": "^0.408.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.2",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
