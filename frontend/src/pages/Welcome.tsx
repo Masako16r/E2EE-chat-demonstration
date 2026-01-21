@@ -29,7 +29,7 @@ export const Welcome = () => {
           <iframe
             width="100%"
             height="100%"
-            src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+            src="https://www.youtube.com/watch?v=5dQb3y3ovd8"
             title="YouTube video player"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen

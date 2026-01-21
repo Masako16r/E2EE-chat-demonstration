@@ -1,470 +1,475 @@
-# Chat con Encriptación End-to-End (E2EE)
-
-## Descripción del Proyecto
-
-Este es un **proof of concept** (prueba de concepto) de una aplicación de chat con encriptación end-to-end. Demuestra cómo implementar cifrado de mensajes de forma que **solo el remitente y el receptor** puedan leer los mensajes intercambiados, utilizando criptografía de curva elíptica (**ECDH P-256**) para derivar claves compartidas y **AES-GCM** para cifrar los mensajes.
-
-**Aviso Importante:** Este proyecto es una demostración educativa y **NO está pensado para ser utilizado en producción**. Tiene limitaciones de seguridad conocidas que se detallan en este documento.
+**Languages:** [English](README.md) | [Español](README.es.md)
 
 ---
 
-## Características Principales
+# End-to-End Encrypted Chat (E2EE)
 
-- **Registro e inicio de sesión** de usuarios con autenticación JWT
-- **Chat en tiempo real** entre usuarios registrados via Socket.io
-- **Encriptación de mensajes** con ECDH P-256 + AES-GCM
-- **Generación automática de claves** ECDH P-256 en el navegador al registrarse
-- **Almacenamiento de claves públicas** en base de datos para derivar claves compartidas
-- **Almacenamiento seguro** de mensajes cifrados (ciphertext + IV) en base de datos
-- **Desencriptación automática** de mensajes al recibirlos
-- **Búsqueda de usuarios** para iniciar conversaciones
-- **Health checks** y sondeos de disponibilidad para Docker
-- **Documentación API** con Swagger
+## Project Description
 
-### Problemas actuales
+This is a **proof of concept** of a chat application with end-to-end encryption. It demonstrates how to implement message encryption so that **only the sender and receiver** can read the exchanged messages, using elliptic curve cryptography (**ECDH P-256**) to derive shared keys and **AES-GCM** to encrypt messages.
 
-- Las claves privadas se almacenan **solo en localStorage del navegador (sin cifrar)**
-- Si cierras el navegador o cambias a una **sesión privada/incógnito**, **perderás acceso a tu clave privada**
-- No podrás leer mensajes anteriores en otros navegadores o dispositivos sin acceso a tu clave privada
-- Sin mecanismo de respaldo, recuperación o sincronización de claves entre dispositivos
-- Las claves privadas quedan almacenadas en localStorage sin protección adicional
+**Important Notice:** This project is an educational demonstration and **NOT intended for production use**. It has known security limitations detailed in this document.
 
 ---
 
-## Cómo Funciona la Encriptación
+## Main Features
 
-### Fundamentos: ECDH + AES-GCM
+- **User registration and login** with JWT authentication
+- **Real-time chat** between registered users via Socket.io
+- **Message encryption** with ECDH P-256 + AES-GCM
+- **Automatic ECDH P-256 key generation** in the browser during registration
+- **Public key storage** in database to derive shared keys
+- **Secure message storage** (ciphertext + IV) in database
+- **Automatic message decryption** upon receipt
+- **User search** to start conversations
+- **Health checks** and availability polling for Docker
+- **API documentation** with Swagger
 
-Este proyecto utiliza:
+### Current Issues
 
-- **ECDH P-256** (Elliptic Curve Diffie-Hellman): Acuerdo de claves criptográficas
-- **AES-GCM** (Advanced Encryption Standard en modo Galois/Counter): Cifrado simétrico autenticado
+- Private keys are stored **only in browser localStorage (unencrypted)**
+- If you close the browser or switch to a **private/incognito session**, **you will lose access to your private key**
+- You won't be able to read previous messages on other browsers or devices without access to your private key
+- No backup, recovery, or key synchronization mechanism between devices
+- Private keys remain stored in localStorage without additional protection
 
-### Flujo Técnico Detallado
+---
+
+## How Encryption Works
+
+### Fundamentals: ECDH + AES-GCM
+
+This project uses:
+
+- **ECDH P-256** (Elliptic Curve Diffie-Hellman): Cryptographic key agreement
+- **AES-GCM** (Advanced Encryption Standard in Galois/Counter mode): Authenticated symmetric encryption
+
+### Detailed Technical Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  GENERACIÓN DE CLAVES (Al registrarse)                      │
+│  KEY GENERATION (During Registration)                       │
 └─────────────────────────────────────────────────────────────┘
   
-  En el navegador del Usuario A:
+  In User A's Browser:
   const keyPair = crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
     true,
     ["deriveBits", "deriveKey"]
   )
   
-  Resultado:
-  ├─ Clave Privada → localStorage del navegador
-  │  └─ Nunca debe salir, pero sin cifrar
-  └─ Clave Pública → Enviada al servidor en BD
-     └─ Puede ser vista por todos
+  Result:
+  ├─ Private Key → browser localStorage
+  │  └─ Should never leave, but unencrypted
+  └─ Public Key → Sent to server in DB
+     └─ Can be viewed by all
 
 ┌─────────────────────────────────────────────────────────────┐
-│  ENVÍO DE MENSAJE CIFRADO (Usuario A → Usuario B)           │
+│  SENDING ENCRYPTED MESSAGE (User A → User B)                │
 └─────────────────────────────────────────────────────────────┘
 
-Paso 1: A obtiene B desde servidor
-  GET /api/users/B → Retorna B
+Step 1: A obtains B from server
+  GET /api/users/B → Returns B
 
-Paso 2: A deriva clave compartida mediante ECDH
+Step 2: A derives shared key via ECDH
   sharedSecret = ECDH(A, B)
   chatKey = AES-GCM-key(sharedSecret)
   
-Paso 3: A cifra el mensaje
+Step 3: A encrypts the message
   IV = crypto.getRandomValues(12 bytes)
-  ciphertext = AES-GCM.encrypt(mensaje, chatKey, IV)
+  ciphertext = AES-GCM.encrypt(message, chatKey, IV)
   
-Paso 4: A envía al servidor
+Step 4: A sends to server
   POST /api/messages/chat/{chatId}/send
   Body: { ciphertext: "...", iv: "..." }
   
-Paso 5: Servidor almacena la entrada del mensaje en un chat de forma encriptada entre los usuarios correspodientes
+Step 5: Server stores message entry in encrypted chat between corresponding users
   INSERT INTO Message (chatId, senderId, ciphertext, iv)
 
 ┌─────────────────────────────────────────────────────────────┐
-│  RECEPCIÓN Y DESENCRIPTACIÓN (Usuario B recibe de A)        │
+│  RECEIVING AND DECRYPTION (User B receives from A)          │
 └─────────────────────────────────────────────────────────────┘
 
-Paso 1: B obtiene A desde servidor
-  GET /api/users/A → Retorna A
+Step 1: B obtains A from server
+  GET /api/users/A → Returns A
 
-Paso 2: B deriva la MISMA clave compartida
+Step 2: B derives the SAME shared key
   sharedSecret = ECDH(B, A)
   chatKey = AES-GCM-key(sharedSecret)
   
-Paso 3: B desencripta en el navegador
-  mensaje = AES-GCM.decrypt(ciphertext, chatKey, IV)
+Step 3: B decrypts in browser
+  message = AES-GCM.decrypt(ciphertext, chatKey, IV)
   
-Paso 4: Mensaje aparece en el chat y puede entenderse
-  Solo A y B pudieron leer el mensaje
+Step 4: Message appears in chat and can be understood
+  Only A and B could read the message
 ```
 
-### Diagrama de Modelo de Claves
+### Key Model Diagram
 
 ```
-ALMACENAMIENTO EN NAVEGADOR (localStorage)
+BROWSER STORAGE (localStorage)
 ┌────────────────────────┐          ┌────────────────────────┐
-│     Usuario A          │          │     Usuario B          │
+│     User A             │          │     User B             │
 │ ────────────────────── │          │ ────────────────────── │
-│ (Clave Privada)        │          │ B (Clave Privada)      │
-│ Guardada en Storage    │          │ Guardada en Storage    │
-│ Sin cifrar             │          │ Sin cifrar             │
+│ (Private Key)          │          │ (Private Key)          │
+│ Saved in Storage       │          │ Saved in Storage       │
+│ Unencrypted            │          │ Unencrypted            │
 └────────────────────────┘          └────────────────────────┘
 
-ALMACENAMIENTO EN SERVIDOR (Base de Datos PostgreSQL)
+SERVER STORAGE (PostgreSQL Database)
 ┌────────────────────────┐          ┌────────────────────────┐
-│ Tabla Users            │          │ Tabla Users            │
+│ Users Table            │          │ Users Table            │
 │ ────────────────────── │          │ ────────────────────── │
 │ publicKey: A (PEM)     │          │ publicKey: B (PEM)     │
-│ Visible para todos     │          │ Visible para todos     │
+│ Visible to all         │          │ Visible to all         │
 └────────────────────────┘          └────────────────────────┘
 
-MENSAJES EN BASE DE DATOS
+MESSAGES IN DATABASE
 ┌────────────────────────────────┐
-│ Tabla Messages                 │
+│ Messages Table                 │
 │ ────────────────────────────── │
 │ ciphertext: "A8B3C2D1..."      │
 │ iv: "E4F5G6H7..."              │
-│ Cifrado, ilegible              │
+│ Encrypted, unreadable          │
 └────────────────────────────────┘
 ```
 
-### ¿Por qué es seguro?
+### Why Is It Secure?
 
 ```
-Para leer un mensaje de A a B, necesitas:
+To read a message from A to B, you need:
 
-Opción 1: La clave privada de A
-  ├─ Está en localStorage del navegador de A
-  └─ Protegida solo por acceso del SO al navegador
+Option 1: A's private key
+  ├─ It's in A's browser localStorage
+  └─ Protected only by OS access to browser
 
-Opción 2: La clave privada de B
-  ├─ Está en localStorage del navegador de B
-  └─ Protegida solo por acceso del SO al navegador
+Option 2: B's private key
+  ├─ It's in B's browser localStorage
+  └─ Protected only by OS access to browser
 
-Sin A o B:
-  No se puede derivar la clave compartida
-  No se puede desencriptar el mensaje
-  El servidor tiene unicamente ciphertext 
+Without A or B:
+  Cannot derive shared key
+  Cannot decrypt message
+  Server has only ciphertext 
 ```
 
 ---
 
-## Instalación y Configuración
-### Requisitos Previos
+## Installation and Configuration
+
+### Prerequisites
 
 - **Node.js** v20
-- **npm** incluido con Node.js
-- **Docker** y **Docker Compose** para base de datos y un proceso de configuración rápido
-- **Git** (opcional, para clonar)
+- **npm** included with Node.js
+- **Docker** and **Docker Compose** for database and quick setup process
+- **Git** (optional, for cloning)
 
-### Paso 1: Clonar el Repositorio
+### Step 1: Clone the Repository
 
 ```bash
 git clone <https://github.com/Masako16r/E2EE-chat-demonstration.git>
 cd E2EE-chat-demonstration
 ```
 
-### Paso 2: Configurar Variables de Entorno
+### Step 2: Configure Environment Variables
 
-**Crea `backend/.env`:**
+**Create `backend/.env`:**
 
 ```env
-# Base de Datos
+# Database
 DATABASE_URL="postgresql://postgres:1234@localhost:5432/e2ee_chat_db"
 
 # JWT
-JWT_SECRET="tu-clave-secreta"
+JWT_SECRET="your-secret-key"
 JWT_EXPIRES_IN="1h"
 
-# Servidor
+# Server
 NODE_ENV="development"
 PORT="4000"
 ```
 
-**Crea `frontend/.env`**:
+**Create `frontend/.env`:**
 
 ```env
 VITE_API_URL="http://localhost:4000"
 ```
 
-### Paso 4: Iniciar Docker Compose
+### Step 3: Start Docker Compose
 
-Desde la raíz del proyecto con el programa instalado previamente:
+From the project root with the program previously installed:
 
 ```bash
 docker-compose up --build
 ```
-Esto ejecuta una serie de archivos, entre ellos docker-compose.yml
-Permite realizar una configuracion completa y levatará los siguientes servicios:
 
-- **PostgreSQL 15** en puerto 5432
-- **Backend** en puerto 4000
-- **Frontend** en puerto 3000
+This executes a series of files, including docker-compose.yml
+It allows complete configuration and will raise the following services:
 
+- **PostgreSQL 15** on port 5432
+- **Backend** on port 4000
+- **Frontend** on port 3000
 
-Accede a `http://localhost:5173` 
-Estos puertos son los predeterminados, por lo que necesariamente no tienen que estar en uso
-por otro servicio donde se encuentre el proyecto ejecutandose. No obstante pueden modificarse
-en el docker-compose.yml.
+Access `http://localhost:5173`
+
+These are the default ports, so they don't necessarily have to be in use by another service where the project is running. However, they can be modified in docker-compose.yml.
 
 ---
 
-## Cómo Usar la Aplicación
+## How to Use the Application
 
-### 1. Crear una Cuenta
+### 1. Create an Account
 
-1. Accede a la página de **Welcome**, por defecto al iniciar el frontend el usuario es redirigido a esta.
-2. Visualiza el video de introducción,
-3. Introduce un correo y contraseña (mín. 6 caracteres) para realizar la prueba, en este caso utiliza el boton de empezar
-3. Haz clic en **Register** 
-4. En el backend:
-   - Se genera un par de claves ECDH P-256
-   - La clave privada se guarda en localStorage
-   - La clave pública se envía al servidor
-   - Se crea el usuario en la BD
+1. Access the **Welcome** page; by default, the user is redirected to this when starting the frontend
+2. Watch the introduction video
+3. Enter an email and password (min. 6 characters) for testing; in this case, use the start button
+4. Click **Register**
+5. In the backend:
+   - An ECDH P-256 key pair is generated
+   - The private key is saved in localStorage
+   - The public key is sent to the server
+   - The user is created in the database
 
-### 2. Iniciar Sesión
+### 2. Log In
 
-1. Ve a **Login**
-2. Introduce tus credenciales
-3. Se genera un JWT token válido por 1 hora
-4. Tu clave privada se carga desde localStorage en caso de encontrarla
+1. Go to **Login**
+2. Enter your credentials
+3. A JWT token valid for 1 hour is generated
+4. Your private key is loaded from localStorage if found
 
-### 3. Buscar Usuarios
+### 3. Search Users
 
-1. En la página de chat, hay un buscador de usuarios
-2. Escribe el email del usuario con el que quieres chatear
-3. Haz clic para iniciar conversación
+1. On the chat page, there is a user search function
+2. Type the email of the user you want to chat with
+3. Click to start a conversation
 
-### 4. Enviar Mensajes Cifrados
+### 4. Send Encrypted Messages
 
-1. Abre una conversación con otro usuario
-2. Escribe tu mensaje
-3. Al hacer clic en **Enviar**:
-   - Se obtiene la clave pública del receptor
-   - Se deriva la clave compartida ECDH
-   - Se encripta con AES-GCM
-   - Se envía solo el `ciphertext` e `iv` al servidor
+1. Open a conversation with another user
+2. Type your message
+3. When you click **Send**:
+   - The receiver's public key is obtained
+   - The shared ECDH key is derived
+   - Encrypted with AES-GCM
+   - Only `ciphertext` and `iv` are sent to the server
 
-### 5. Recibir y Leer Mensajes
+### 5. Receive and Read Messages
 
-1. El mensaje cifrado llega via Socket.io en tiempo real
-2. Tu navegador:
-   - Obtiene la clave pública del remitente
-   - Deriva la clave compartida con tu clave privada
-   - Desencripta automáticamente
-   - Muestra el mensaje en pantalla
+1. The encrypted message arrives via Socket.io in real-time
+2. Your browser:
+   - Gets the sender's public key
+   - Derives the shared key with your private key
+   - Automatically decrypts
+   - Displays the message on screen
+
 ---
 
-## Administración de la Base de Datos
+## Database Management
 
-### Ver la Base de Datos
+### View the Database
 
-**Opción 1: Prisma Studio (Recomendado)**
+**Option 1: Prisma Studio (Recommended)**
 ```bash
 cd backend
 npx prisma studio
 ```
 
-**Opción 2: Acceder a PostgreSQL directamente**
+**Option 2: Access PostgreSQL directly**
 ```bash
-# Con Docker
+# With Docker
 docker exec -it e2ee_chat_db psql -U postgres -d e2ee_chat_db
 
-# Consultas útiles
-\dt                           # Listar tablas
-SELECT * FROM "User";         # Ver usuarios
-SELECT * FROM "Message";      # Ver mensajes cifrados
+# Useful queries
+\dt                           # List tables
+SELECT * FROM "User";         # View users
+SELECT * FROM "Message";      # View encrypted messages
 ```
 
-### Restablecer la Base de Datos Completamente
+### Reset Database Completely
 
-**Opción 1: Con Prisma**
+**Option 1: With Prisma**
 ```bash
 cd backend
 npx prisma migrate reset
-# Esto:
-# 1. Deshace todas las migraciones
-# 2. Borra la BD
-# 3. Vuelve a crear y aplica migraciones
+# This:
+# 1. Undoes all migrations
+# 2. Deletes the database
+# 3. Recreates and applies migrations
 ```
 
-**Opción 2: Con Docker Compose**
+**Option 2: With Docker Compose**
 ```bash
-# Detener y eliminar volumen de datos
+# Stop and remove data volume
 docker-compose down -v
 
-# Volver a levantarlo (recreará todo limpio)
+# Start again (will recreate everything clean)
 docker-compose up -d
 ```
 
-### Crear una Nueva Migración
+### Create a New Migration
 
-Si cambias el `schema.prisma`:
+If you change `schema.prisma`:
 
 ```bash
 cd backend
-npx prisma migrate dev --name nombre
+npx prisma migrate dev --name name
 ```
 
-Ejemplo:
+Example:
 ```bash
 npx prisma migrate dev --name add_message_reactions
 ```
 
 ---
 
-## Limitaciones y Problemas de Seguridad
+## Limitations and Security Issues
 
-### Problema 1: Pérdida de Acceso en Otros Navegadores/Dispositivos
+### Problem 1: Loss of Access on Other Browsers/Devices
 
-**Síntoma:** Te registras en Chrome, cierras navegador, abres Firefox y no puedes leer mensajes antiguos.
+**Symptom:** You register in Chrome, close the browser, open Firefox and cannot read old messages.
 
-**Causa:** Las claves privadas están en `localStorage` que es específico de cada navegador/sesión.
+**Cause:** Private keys are in `localStorage` which is specific to each browser/session.
 
 ```
-Chrome (Usuario A)          Firefox (Usuario A)
-├─ en localStorage          ├─ NO existe
-├─ Lee mensajes             └─ No puede leer
-└─ localStorage isolado      localStorage separado
+Chrome (User A)             Firefox (User A)
+├─ in localStorage          ├─ Does NOT exist
+├─ Reads messages           └─ Cannot read
+└─ localStorage isolated     separate localStorage
 ```
 
-**Impacto:** 
-- Pierdes acceso permanentemente a mensajes antiguos
-- No hay forma de recuperar la clave privada
-- Cada navegador es efectivamente un usuario "nuevo"
+**Impact:**
+- You permanently lose access to old messages
+- No way to recover the private key
+- Each browser is effectively a "new" user
 
-### Problema 2: Almacenamiento de Clave Privada Sin Cifrar
+### Problem 2: Unencrypted Private Key Storage
 
-**Síntoma:** Alguien con acceso a tu computadora puede leer tu localStorage.
+**Symptom:** Anyone with access to your computer can read your localStorage.
 
-**Causa:** localStorage es accesible en texto plano desde DevTools o scripts.
+**Cause:** localStorage is accessible in plain text from DevTools or scripts.
 
 ```javascript
-// Cualquiera en la máquina puede hacer esto:
+// Anyone on the machine can do this:
 const privateKey = localStorage.getItem('e2ee_private_key');
-console.log(privateKey); // ¡Clave expuesta!
+console.log(privateKey); // Key exposed!
 ```
 
-**Impacto:**
-- Compromiso completo si la máquina es accesible o tiene algún tipo de vulnerabilidad y es accesible por un tercero.
-- No hay protección de SO a nivel de aplicación
+**Impact:**
+- Complete compromise if the machine is accessible or has any type of vulnerability and is accessible by a third party
+- No OS-level protection at the application level
 
-### Problema 3: Sin Verificación de Identidad
+### Problem 3: No Identity Verification
 
-**Síntoma:** No hay forma de verificar que una clave pública pertenece realmente al usuario que dice ser.
+**Symptom:** There is no way to verify that a public key really belongs to the user who claims to be.
 
-**Causa:** Las claves se envían sin firmar o certificar.
+**Cause:** Keys are sent without signing or certification.
 
 ```
-¿Cómo sé que B realmente es de "usuario@example.com"?
-└─ No hay mecanismo criptográfico para verificarlo
-└─ Un atacante podría sustituir B por su propia clave
+How do I know that B really is "user@example.com"?
+└─ There is no cryptographic mechanism to verify it
+└─ An attacker could replace B with their own key
 ```
 
-**Impacto:** 
-- Vulnerable a ataques de intermediario (MITM)
-- Un admin del servidor podría sustituir claves
+**Impact:**
+- Vulnerable to man-in-the-middle (MITM) attacks
+- A server admin could replace keys
 
-### Problema 4: Sin Recuperación de Claves
+### Problem 4: No Key Recovery
 
-**Síntoma:** Si accidentalmente limpias localStorage, la clave privada se pierde para siempre.
+**Symptom:** If you accidentally clear localStorage, the private key is lost forever.
 
-**Causa:** No hay respaldo ni forma de recuperar claves.
+**Cause:** There is no backup or way to recover keys.
 
-**Impacto:**
-- Imposible leer mensajes anteriores
-- Imposible recuperarse del error
+**Impact:**
+- Impossible to read previous messages
+- Impossible to recover from the error
 
 ---
 
-## Arquitectura del Proyecto
+## Project Architecture
 
-### Estructura de Carpetas
+### Folder Structure
 
 ```
 E2EE-chat-demonstration/
 │
-├── docker-compose.yml          # Definición de servicios (backend, frontend, DB)
-├── README.md                    # Este archivo
+├── docker-compose.yml          # Service definition (backend, frontend, DB)
+├── README.md                    # This file
 │
-├── backend/                     # Servidor Node.js + Express
-│   ├── dockerfile              # Imagen Docker del backend
-│   ├── package.json            # Dependencias backend
-│   ├── prisma.config.ts        # Configuración de Prisma
-│   ├── swagger.json            # Documentación API (OpenAPI)
+├── backend/                     # Node.js + Express Server
+│   ├── dockerfile              # Backend Docker image
+│   ├── package.json            # Backend dependencies
+│   ├── prisma.config.ts        # Prisma configuration
+│   ├── swagger.json            # API documentation (OpenAPI)
 │   │
 │   ├── prisma/
-│   │   ├── schema.prisma       # Esquema de base de datos (Modelos)
-│   │   ├── migrations/         # Migraciones de BD versionadas
+│   │   ├── schema.prisma       # Database schema (Models)
+│   │   ├── migrations/         # Versioned database migrations
 │   │   │   └── 0_init/
 │   │   │       └── migration.sql
-│   │   └── generated/          # Cliente Prisma autogenerado
+│   │   └── generated/          # Auto-generated Prisma client
 │   │       └── main/
 │   │           ├── client.ts
 │   │           ├── models.ts
 │   │           └── ...
 │   │
 │   └── src/
-│       ├── index.js            # Punto de entrada (Express + Socket.io)
-│       ├── db.js               # Configuración de Prisma
-│       ├── health.js           # Health checks para Docker
+│       ├── index.js            # Entry point (Express + Socket.io)
+│       ├── db.js               # Prisma configuration
+│       ├── health.js           # Health checks for Docker
 │       │
-│       ├── controllers/        # Lógica de negocio
-│       │   └── auth.controller.js    # Registro, login
+│       ├── controllers/        # Business logic
+│       │   └── auth.controller.js    # Registration, login
 │       │
-│       ├── routes/             # Definición de endpoints
+│       ├── routes/             # Endpoint definition
 │       │   ├── auth.routes.js  # POST /api/auth/{register,login}
 │       │   ├── user.js         # GET /api/users
 │       │   └── messages.js     # POST/GET /api/messages/*
 │       │
-│       ├── middleware/         # Funciones intermedias
-│       │   ├── auth.middleware.js      # Validación de JWT
-│       │   ├── error.middleware.js     # Manejo de errores
-│       │   └── validation.middleware.js # Validación de entrada
+│       ├── middleware/         # Middleware functions
+│       │   ├── auth.middleware.js      # JWT validation
+│       │   ├── error.middleware.js     # Error handling
+│       │   └── validation.middleware.js # Input validation
 │       │
-│       └── generated/          # Tipos generados desde Prisma
+│       └── generated/          # Types generated from Prisma
 │           └── prisma/
 │
 ├── frontend/                    # React + TypeScript + Vite
-│   ├── dockerfile              # Imagen Docker del frontend
-│   ├── package.json            # Dependencias frontend
-│   ├── vite.config.ts          # Configuración de Vite
-│   ├── index.html              # HTML raíz
+│   ├── dockerfile              # Frontend Docker image
+│   ├── package.json            # Frontend dependencies
+│   ├── vite.config.ts          # Vite configuration
+│   ├── index.html              # Root HTML
 │   │
 │   └── src/
-│       ├── main.tsx            # Punto de entrada React
-│       ├── App.tsx             # Componente raíz
-│       ├── App.css             # Estilos globales
+│       ├── main.tsx            # React entry point
+│       ├── App.tsx             # Root component
+│       ├── App.css             # Global styles
 │       │
-│       ├── api/                # Llamadas HTTP a backend
+│       ├── api/                # HTTP calls to backend
 │       │   ├── auth.ts         # POST register, login
-│       │   └── messages.ts     # Gestión de chats y mensajes
+│       │   └── messages.ts     # Chat and message management
 │       │
-│       ├── crypto/             # Lógica criptográfica
+│       ├── crypto/             # Cryptographic logic
 │       │   ├── encryption.ts   # ECDH + AES-GCM
-│       │   ├── keys.ts         # Generación e importación de claves
-│       │   ├── session.ts      # Gestión de sesión criptográfica
-│       │   └── storage.ts      # localStorage de claves privadas
+│       │   ├── keys.ts         # Key generation and import
+│       │   ├── session.ts      # Cryptographic session management
+│       │   └── storage.ts      # localStorage for private keys
 │       │
-│       ├── pages/              # Componentes de páginas
-│       │   ├── Welcome.tsx     # Página de inicio
-│       │   ├── Register.tsx    # Formulario de registro
-│       │   ├── Login.tsx       # Formulario de login
-│       │   ├── Chat.tsx        # Página de chat principal
+│       ├── pages/              # Page components
+│       │   ├── Welcome.tsx     # Landing page
+│       │   ├── Register.tsx    # Registration form
+│       │   ├── Login.tsx       # Login form
+│       │   ├── Chat.tsx        # Main chat page
 │       │   ├── Home.tsx        # Dashboard
-│       │   └── Demonstration.tsx # Página de demostración
+│       │   └── Demonstration.tsx # Demo page
 │       │
-│       └── styles/             # Estilos CSS
+│       └── styles/             # CSS styles
 │           ├── auth.css
 │           ├── chat.css
 │           ├── palette.css
 │           └── ...
 ```
 
-### Flujo de Datos
+### Data Flow
 
 ```
 ┌─────────────┐                      ┌──────────────┐
@@ -511,35 +516,34 @@ E2EE-chat-demonstration/
       │
 ```
 
-### Tecnologías Utilizadas
+### Technologies Used
 
 **Backend:**
-- **Node.js v20** - Runtime JavaScript
-- **Express.js** - Framework web
-- **Prisma ORM** - Acceso a base de datos
-- **PostgreSQL** - Base de datos relacional
-- **Socket.io** - Comunicación en tiempo real
-- **JWT** - Autenticación con tokens
-- **bcrypt** - Hash de contraseñas
-- **Swagger/OpenAPI** - Documentación API
+- **Node.js v20** - JavaScript runtime
+- **Express.js** - Web framework
+- **Prisma ORM** - Database access
+- **PostgreSQL** - Relational database
+- **Socket.io** - Real-time communication
+- **JWT** - Token-based authentication
+- **bcrypt** - Password hashing
+- **Swagger/OpenAPI** - API documentation
 
 **Frontend:**
 - **React 18** - UI framework
-- **TypeScript** - Tipado estático
-- **Vite** - Build tool y dev server
-- **React Router** - Navegación
-- **Socket.io Client** - Cliente para WebSockets
-- **Web Crypto API** - Criptografía nativa del navegador
+- **TypeScript** - Static typing
+- **Vite** - Build tool and dev server
+- **React Router** - Navigation
+- **Socket.io Client** - WebSocket client
+- **Web Crypto API** - Native browser cryptography
 
-**Infraestructura:**
-- **Docker** - Containerización
-- **Docker Compose** - Orquestación local
-- **PostgreSQL 15 Alpine** - BD en contenedor
+**Infrastructure:**
+- **Docker** - Containerization
+- **Docker Compose** - Local orchestration
+- **PostgreSQL 15 Alpine** - Database in container
 
 ---
 
-
-## Modelo de Datos (Schema)
+## Data Model (Schema)
 
 ```
 ┌──────────────────────────────┐
@@ -603,84 +607,81 @@ E2EE-chat-demonstration/
 
 ---
 
-## Endpoints API
+## API Endpoints
 
-Todos los endpoints generados puede verse a través de Swagger, **http://localhost:4000/api-docs/#/**
-
----
-
-
-## Limitaciones de Seguridad y Problemas Conocidos
-
-### 1. **Pérdida de Acceso en Otros Navegadores**
-
-**Problema:** Si inicias sesión en otro navegador (incluso privado), no podrás leer mensajes anteriores.
-
-```
-Usuario en Chrome          Usuario en Firefox (Incógnito)
-├── Clave Privada       ├── Clave Privada (No existe)
-└── Lee mensajes        └── No puede nada 
-```
-
-**Por qué sucede:**
-- Las claves privadas se almacenan en `localStorage` del navegador
-- Cada navegador/sesión tiene su propio almacenamiento
-- No hay sincronización entre dispositivos
-
-### 2. **Sin Recuperación de Claves**
-
-- Si pierdes el acceso al navegador, **pierdes acceso permanente a tu clave privada**
-- No hay forma de recuperar o restablecer claves
-
-### 3. **Almacenamiento en Cliente No Seguro**
-
-- El almacenamiento local del navegador no es cifrado
-- Cualquiera con acceso a la computadora puede ver las claves privadas
+All generated endpoints can be viewed through Swagger at **http://localhost:4000/api-docs/#/**
 
 ---
 
-## Soluciones Sugeridas (Futuras Mejoras)
+## Security Limitations and Known Issues
 
-Estos son enfoques que podrían implementarse para resolver los problemas de acceso y seguridad:
+### 1. **Loss of Access on Other Browsers**
 
-### Opción 1: **Código QR para Transferencia de Claves**
-
-- Al cambiar de dispositivo/navegador, escanear un código QR en una seccion mientras todavía cuentas con ambas claves
-- El código QR contiene la clave privada encriptada
-- Solo se puede usar una vez por razones de seguridad, y es transferido al nuevo navegador
+**Problem:** If you log in to another browser (even private mode), you won't be able to read old messages.
 
 ```
-Navegador 1                    Navegador 2
+User in Chrome              User in Firefox (Private)
+├── Private Key          ├── Private Key (Does not exist)
+└── Reads messages       └── Can't do anything
+```
+
+**Why it happens:**
+- Private keys are stored in the browser's `localStorage`
+- Each browser/session has its own storage
+- No synchronization between devices
+
+### 2. **No Key Recovery**
+
+- If you lose access to the browser, **you lose permanent access to your private key**
+- There is no way to recover or reset keys
+
+### 3. **Unsecure Client Storage**
+
+- Browser localStorage is not encrypted
+- Anyone with access to the computer can see private keys
+
+---
+
+## Suggested Solutions (Future Improvements)
+
+These are approaches that could be implemented to solve access and security issues:
+
+### Option 1: **QR Code for Key Transfer**
+
+- When changing device/browser, scan a QR code in a section while you still have both keys
+- The QR code contains the encrypted private key
+- Can only be used once for security reasons, and is transferred to the new browser
+
+```
+Browser 1                    Browser 2
   ↓                              ↓
-Genera QR                      Escanea QR
+Generates QR                  Scans QR
   ↓                              ↓
-QR encriptado                  Recibe clave privada
+Encrypted QR                  Receives private key
   ↓                              ↓
-Leer mensajes                  Leer mensajes
+Read messages                 Read messages
 ```
 
-### Opción 2: **Autenticación Multifactor (MFA)**
+### Option 2: **Multi-Factor Authentication (MFA)**
 
-- Combinar contraseña + segundo factor (SMS, email, app)
-- El servidor puede entregar claves privadas de forma segura
+- Combine password + second factor (SMS, email, app)
+- Server can securely deliver private keys
 
-### Opción 3: **Almacenamiento en Servidor (Menos Seguro)**
+### Option 3: **Server Storage (Less Secure)**
 
-- Las claves privadas se almacenan encriptadas en el servidor
-- El usuario proporciona una contraseña para desencriptarlas
-- Mayor riesgo de compromiso del servidor en caso de ser expuestas
+- Private keys are stored encrypted on the server
+- User provides a password to decrypt them
+- Higher risk of compromise if server is exposed
 
 ---
 
+## Important Notes
 
-## Notas Importantes
+1. **Do not use in production** without implementing additional security measures
+2. **Private keys should never leave the browser**
 
-1. **No usar en producción** sin implementar medidas de seguridad adicionales
-2. **Las claves privadas jamás deben salir del navegador**
 ---
 
+## License
 
-## Licencia
-
-
-Este proyecto está bajo la Licencia MIT. Consulta el archivo [LICENSE](LICENSE) para más detalles.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
